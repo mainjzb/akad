@@ -12,7 +12,7 @@ import (
 // https://cdn-fastly.obsproject.com/downloads/OBS-Studio-29.1.3-Full-Installer-x64.exe
 // https://client-updates-cdn77.badlion.net/Badlion%20Client%20Setup%203.16.0.exe
 func main() {
-	t, err := NewTask("https://client-updates-cdn77.badlion.net/Badlion%20Client%20Setup%203.16.0.exe")
+	t, err := NewTask("https://cdn-fastly.obsproject.com/downloads/OBS-Studio-29.1.3-Full-Installer-x64.exe")
 	if err != nil {
 		fmt.Println(err)
 		return

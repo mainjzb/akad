@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"net/url"
 	"sync"
 
@@ -14,6 +13,7 @@ const MAXTask = 8
 type Task struct {
 	url *url.URL
 	l   []*MyReader
+	wg  *sync.WaitGroup
 
 	contentLength int64
 }
@@ -24,14 +24,13 @@ func NewTask(u string) (*Task, error) {
 		return nil, err
 	}
 	return &Task{
+		wg:  &sync.WaitGroup{},
 		url: _url,
 	}, nil
 }
 
 func (t *Task) Run() {
-	wg := &sync.WaitGroup{}
-
-	resp, err := Connect(*t.url, "143.244.51.206")
+	resp, err := Connect(*t.url, "151.101.1.91")
 	if err != nil {
 		log.Error("DownloadIP err: ", err.Error())
 		// todo
@@ -40,16 +39,12 @@ func (t *Task) Run() {
 	// only for first
 	t.contentLength = GetContentLength(resp.Header)
 
-	t.l = append(t.l, &MyReader{
-		ctx: context.Background(),
-		r:   resp.Body,
-		max: t.contentLength / 2,
-	})
+	t.l = append(t.l, NewMyReader(resp.Body, 0, t.contentLength))
 
 	resBytes := bytes.NewBuffer(nil)
-	wg.Add(1)
+	t.wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer t.wg.Done()
 		resBytes.ReadFrom(t.l[0])
 	}()
 
@@ -57,25 +52,50 @@ func (t *Task) Run() {
 	// second task
 	// second task
 
-	resp2, err := ConnectWithRange(*t.url, "89.187.187.11", t.contentLength/2+1, t.contentLength)
+	t.DoubleTask()
+	t.DoubleTask()
+	t.DoubleTask()
+	t.DoubleTask()
+	t.DoubleTask()
+
+	t.wg.Wait()
+}
+
+func (t *Task) SpawnChild(parent *MyReader) (*MyReader, error) {
+	start := parent.Start + parent.Max.Load()/2
+	end := parent.Start + parent.Max.Load()
+
+	resp, err := ConnectWithRange(*t.url, "151.101.65.91", start, end)
 	if err != nil {
-		log.Error("DownloadIP err: ", err.Error())
-		// todo
-		return
+		return nil, err
 	}
 
-	t.l = append(t.l, &MyReader{
-		ctx: context.Background(),
-		r:   resp2.Body,
-		max: t.contentLength - t.contentLength/2,
-	})
+	parent.Max.Store(parent.Max.Load() / 2)
+
+	reader := NewMyReader(resp.Body, start, end)
 
 	resBytes2 := bytes.NewBuffer(nil)
-	wg.Add(1)
+	t.wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer t.wg.Done()
 		resBytes2.ReadFrom(t.l[1])
 	}()
 
-	wg.Wait()
+	return reader, nil
+}
+
+func (t *Task) DoubleTask() {
+	res := make([]*MyReader, 0, len(t.l)*2)
+	for _, l := range t.l {
+		res = append(res, l)
+		child, err := t.SpawnChild(l)
+		if err != nil {
+			log.Error(err)
+			// todo 重新创建child
+			continue
+		}
+
+		res = append(res, child)
+	}
+	t.l = res
 }

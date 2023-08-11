@@ -42,9 +42,11 @@ func Connect(u url.URL, ip string) (*http.Response, error) {
 }
 
 func ConnectWithRange(u url.URL, ip string, start, end int64) (*http.Response, error) {
-	client := &http.Client{Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}}
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 	host := u.Host
 	// todo 考虑host中有端口的情况
 	u.Host = ip
@@ -71,5 +73,5 @@ func Range(start, end int64) string {
 	if end == 0 {
 		return fmt.Sprintf("bytes=%d-", start)
 	}
-	return fmt.Sprintf("bytes=%d-%d", start, end)
+	return fmt.Sprintf("bytes=%d-%d", start, end-1)
 }
